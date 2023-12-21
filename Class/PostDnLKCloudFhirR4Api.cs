@@ -307,7 +307,23 @@ namespace PostDnLKCloudFhirR4Api.Class
                                 if (entry.Resource.TypeName.ToUpper() == "PATIENT")
                                 {
                                     var response = await fhirR4API.CreateRecord(fhirSerializer.SerializeToString(entry.Resource), entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
-                                    entry.Resource = fhirParser.Parse<Patient>(response);
+                                    if (response.Contains("OperationOutcome"))
+                                    {
+                                        OperationOutcome outcome = fhirParser.Parse<OperationOutcome>(response);
+                                        string errorMessages = String.Join("; ", outcome.Issue.Select(x => x.Diagnostics));
+                                        if (errorMessages.Contains("Authentication Error") || errorMessages.Contains("Credentials are not valid"))
+                                        {
+                                            throw new TransientException(errorMessages);
+                                        }
+                                        else
+                                        {
+                                            throw new Exception(errorMessages);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        entry.Resource = fhirParser.Parse<Patient>(response);
+                                    }
                                 }
                                 else
                                 {
@@ -369,6 +385,7 @@ namespace PostDnLKCloudFhirR4Api.Class
                 {
                     case CustomAPIException customResponseEx:
                         return GetErrorStatusBasedOnHttpStatusCode(customResponseEx.HttpResponse.StatusCode, events);
+                    case TransientException _:
                     case HttpRequestException _:
                     case WebException _:
                     case SocketException _:
