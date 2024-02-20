@@ -296,6 +296,7 @@ namespace PostDnLKCloudFhirR4Api.Class
                     throw new Exception($"Patient resource not found in FHIR Bundle.");
                 }
 
+                bundle.Type = BundleType.BatchResponse;
                 foreach (EntryComponent entry in bundle.Entry)
                 {
                     if (entry.Request != null)
@@ -306,8 +307,8 @@ namespace PostDnLKCloudFhirR4Api.Class
                             {
                                 if (entry.Resource.TypeName.ToUpper() == "PATIENT")
                                 {
-                                    var response = await fhirR4API.CreateRecord(fhirSerializer.SerializeToString(entry.Resource), entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
-                                    if (response.Contains("OperationOutcome"))
+                                    dynamic response = await fhirR4API.CreateRecord(fhirSerializer.SerializeToString(entry.Resource), entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
+                                    if (response.responseString.Contains("OperationOutcome"))
                                     {
                                         OperationOutcome outcome = fhirParser.Parse<OperationOutcome>(response);
                                         string errorMessages = String.Join("; ", outcome.Issue.Select(x => x.Diagnostics));
@@ -322,7 +323,10 @@ namespace PostDnLKCloudFhirR4Api.Class
                                     }
                                     else
                                     {
-                                        entry.Resource = fhirParser.Parse<Patient>(response);
+                                        entry.Request = null;
+                                        entry.Resource = fhirParser.Parse<Patient>(response.responseString);
+                                        entry.Response = new ResponseComponent();
+                                        entry.Response.Status = response.httpStatus;
                                     }
                                 }
                                 else
@@ -339,10 +343,6 @@ namespace PostDnLKCloudFhirR4Api.Class
                         {
                             throw new Exception($"Request.Method is missing for entry {entry.Request.Method}.");
                         }
-                    }
-                    else
-                    {
-                        throw new Exception($"Request is missing for entry {entry.Resource.TypeName}.");
                     }
                 }
                 File.WriteAllText(Path.Combine(ResponseFilesFolder, _hl7Util.GetNextFileName(ResponseFilesFolder, Path.GetFileName(_trxFile.FileName))), fhirSerializer.SerializeToString(bundle));
