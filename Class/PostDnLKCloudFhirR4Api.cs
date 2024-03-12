@@ -312,8 +312,9 @@ namespace PostDnLKCloudFhirR4Api.Class
                                     {
                                         OperationOutcome outcome = fhirParser.Parse<OperationOutcome>(response);
                                         string errorMessages = String.Join("; ", outcome.Issue.Select(x => x.Diagnostics));
-                                        if (errorMessages.Contains("Authentication Error") || errorMessages.Contains("Credentials are not valid"))
+                                        if (errorMessages.Contains("Authentication Error") || errorMessages.Contains("Authentication failed") || errorMessages.Contains("Credentials are not valid") || response.httpStatus == "401-Unauthorized" || response.httpStatus == "403-Forbidden")
                                         {
+                                            await fhirR4API.ExpireToken();
                                             throw new TransientException(errorMessages);
                                         }
                                         else
