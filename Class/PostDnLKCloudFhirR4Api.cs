@@ -277,12 +277,11 @@ namespace PostDnLKCloudFhirR4Api.Class
 
             var fhirSerializer = new FhirJsonSerializer();
             var fhirParser = new FhirJsonParser();
+            Auth auth = new Auth { AuthorizationUrl = AuthorizationUrl, ClientID = ClientId, ClientSecret = ClientSecret };
+            FhirR4APIHelper fhirR4API = new FhirR4APIHelper(auth, events);
             try
             {
                 // logic
-                Auth auth = new Auth { AuthorizationUrl = AuthorizationUrl, ClientID = ClientId, ClientSecret = ClientSecret };
-
-                FhirR4APIHelper fhirR4API = new FhirR4APIHelper(auth, events);
                 Bundle bundle = fhirParser.Parse<Bundle>(_fileContent);
 
                 bool hasPatientResource = false;
@@ -360,7 +359,7 @@ namespace PostDnLKCloudFhirR4Api.Class
                 //unwrap the AggregateException and loop through each one to try and identify transient errors, otherwise mark file as error 
                 foreach (Exception innerException in aggEx.InnerExceptions)
                 {
-                    errorStatus = EvaluateExceptionForTransientError(innerException, events);
+                    errorStatus = EvaluateExceptionForTransientError(innerException, events, fhirR4API);
 
                     if (errorStatus == ResultDetails.LKTransferResponseStatus.TransientError)
                     {
@@ -374,18 +373,18 @@ namespace PostDnLKCloudFhirR4Api.Class
             {
                 events.Exception("Unexpected exception occurred while processing the file.", ex);
                 events.Debug("Marking file as Error.");
-                return _hl7Util.ErrorResultDetails(resultDetails, $"Error: {ex.Message}", EvaluateExceptionForTransientError(ex, events));
+                return _hl7Util.ErrorResultDetails(resultDetails, $"Error: {ex.Message}", EvaluateExceptionForTransientError(ex, events, fhirR4API));
             }
         }
 
-        private int EvaluateExceptionForTransientError(Exception ex, IEventFactory events)
+        private int EvaluateExceptionForTransientError(Exception ex, IEventFactory events, FhirR4APIHelper fhirR4API)
         {
             try
             {
                 switch (ex)
                 {
                     case CustomAPIException customResponseEx:
-                        return GetErrorStatusBasedOnHttpStatusCode(customResponseEx.HttpResponse.StatusCode, events);
+                        return GetErrorStatusBasedOnHttpStatusCode(customResponseEx.HttpResponse.StatusCode, events, fhirR4API);
                     case TransientException _:
                     case HttpRequestException _:
                     case WebException _:
@@ -407,18 +406,20 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
         }
 
-        private int GetErrorStatusBasedOnHttpStatusCode(HttpStatusCode statusCode, IEventFactory events)
+        private int GetErrorStatusBasedOnHttpStatusCode(HttpStatusCode statusCode, IEventFactory events, FhirR4APIHelper fhirR4API)
         {
             switch (statusCode)
             {
                 case HttpStatusCode.Unauthorized: //401 - requires human intervention to fix the credentials, mark as transient-error so once credentials are fixed queue continues, If token expire unauthorized
                     events.Debug("Marking file as TransientError. Credentials are invalid or Token is invalid.");
+                    fhirR4API.ExpireToken().GetAwaiter().GetResult();
                     return ResultDetails.LKTransferResponseStatus.TransientError;
                 case HttpStatusCode.ServiceUnavailable: //503 - api is down, hold message queue & keep retrying 
                     events.Debug("Marking file as TransientError. API is currently unavailable.");
                     return ResultDetails.LKTransferResponseStatus.TransientError;
                 case HttpStatusCode.Forbidden: //403 - token expired 
                     events.Debug("Marking file as TransientError - token expired. Token will refresh on next attempt.");
+                    fhirR4API.ExpireToken().GetAwaiter().GetResult();
                     return ResultDetails.LKTransferResponseStatus.TransientError;
                 default:
                     events.Debug("Marking file as Error.");
