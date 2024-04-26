@@ -304,34 +304,31 @@ namespace PostDnLKCloudFhirR4Api.Class
                         {
                             if (entry.Request.Method == HTTPVerb.POST)
                             {
-                                if (entry.Resource.TypeName.ToUpper() == "PATIENT")
+                                dynamic response = await fhirR4API.CreateRecord(fhirSerializer.SerializeToString(entry.Resource), entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
+                                if (response.responseString.Contains("OperationOutcome"))
                                 {
-                                    dynamic response = await fhirR4API.CreateRecord(fhirSerializer.SerializeToString(entry.Resource), entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
-                                    if (response.responseString.Contains("OperationOutcome"))
+                                    OperationOutcome outcome = fhirParser.Parse<OperationOutcome>(response);
+                                    string errorMessages = String.Join("; ", outcome.Issue.Select(x => x.Diagnostics));
+                                    if (errorMessages.Contains("Authentication Error") || errorMessages.Contains("Authentication failed") || errorMessages.Contains("Credentials are not valid") || response.httpStatus == "401-Unauthorized" || response.httpStatus == "403-Forbidden")
                                     {
-                                        OperationOutcome outcome = fhirParser.Parse<OperationOutcome>(response);
-                                        string errorMessages = String.Join("; ", outcome.Issue.Select(x => x.Diagnostics));
-                                        if (errorMessages.Contains("Authentication Error") || errorMessages.Contains("Authentication failed") || errorMessages.Contains("Credentials are not valid") || response.httpStatus == "401-Unauthorized" || response.httpStatus == "403-Forbidden")
-                                        {
-                                            await fhirR4API.ExpireToken();
-                                            throw new TransientException(errorMessages);
-                                        }
-                                        else
-                                        {
-                                            throw new Exception(errorMessages);
-                                        }
+                                        await fhirR4API.ExpireToken();
+                                        throw new TransientException(errorMessages);
                                     }
                                     else
                                     {
-                                        entry.Request = null;
-                                        entry.Resource = fhirParser.Parse<Patient>(response.responseString);
-                                        entry.Response = new ResponseComponent();
-                                        entry.Response.Status = response.httpStatus;
+                                        throw new Exception(errorMessages);
                                     }
                                 }
                                 else
                                 {
-                                    throw new Exception($"{entry.Resource.TypeName} resource is not supported.");
+                                    entry.Request = null;
+                                    if (entry.Resource.TypeName == "Patient")
+                                        entry.Resource = fhirParser.Parse<Patient>(response.responseString);
+                                    else if (entry.Resource.TypeName == "Encounter")
+                                        entry.Resource = fhirParser.Parse<Encounter>(response.responseString);
+
+                                    entry.Response = new ResponseComponent();
+                                    entry.Response.Status = response.httpStatus;
                                 }
                             }
                             else
