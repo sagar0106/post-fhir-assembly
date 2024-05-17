@@ -304,7 +304,17 @@ namespace PostDnLKCloudFhirR4Api.Class
                         {
                             if (entry.Request.Method == HTTPVerb.POST)
                             {
-                                dynamic response = await fhirR4API.CreateRecord(fhirSerializer.SerializeToString(entry.Resource), entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
+                                string serialized = fhirSerializer.SerializeToString(entry.Resource);
+                                if (entry.Resource.TypeName == "Coverage")
+                                {
+                                    Encounter encounterResource = bundle.GetResources().Where(p => p.TypeName.ToUpper() == "ENCOUNTER").FirstOrDefault() as Encounter;
+                                    string finNumber = encounterResource.Identifier.Find(x => x.System == "urn:oid:2.16.840.1.113883.3.1205.2.1.3.600")?.Value;
+                                    if (!String.IsNullOrWhiteSpace(finNumber))
+                                    {
+                                        serialized = serialized.Replace("<FIN_NUMBER>", finNumber);
+                                    }
+                                }
+                                dynamic response = await fhirR4API.CreateRecord(serialized, entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
                                 if (response.responseString.Contains("OperationOutcome"))
                                 {
                                     OperationOutcome outcome = fhirParser.Parse<OperationOutcome>(response);
