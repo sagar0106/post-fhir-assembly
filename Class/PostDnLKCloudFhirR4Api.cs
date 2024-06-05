@@ -308,7 +308,7 @@ namespace PostDnLKCloudFhirR4Api.Class
                                 if (entry.Resource.TypeName == "Coverage")
                                 {
                                     Encounter encounterResource = bundle.GetResources().Where(p => p.TypeName.ToUpper() == "ENCOUNTER").FirstOrDefault() as Encounter;
-                                    string finNumber = encounterResource.Identifier.Find(x => x.System == "urn:oid:2.16.840.1.113883.3.1205.2.1.3.600")?.Value;
+                                    string finNumber = encounterResource.Extension.Any() ? encounterResource.Extension[0].Extension?.Find(x => x.ElementId == "custom-intermountain-fin-fin")?.Value?.ToString() : "";
                                     if (!String.IsNullOrWhiteSpace(finNumber))
                                     {
                                         serialized = serialized.Replace("<FIN_NUMBER>", finNumber);
