@@ -333,7 +333,14 @@ namespace PostDnLKCloudFhirR4Api.Class
                                 {
                                     entry.Request = null;
                                     if (entry.Resource.TypeName == "Patient")
-                                        entry.Resource = fhirParser.Parse<Patient>(response.responseString);
+                                    {
+                                        Patient patient = fhirParser.Parse<Patient>(response.responseString);
+                                        if (!String.IsNullOrWhiteSpace(patient?.Id))
+                                        {
+                                            response = await fhirR4API.GetRecord($"{FHIRBaseUrl}/{entry.Resource.TypeName}/{patient.Id}", SiteServiceKey).ConfigureAwait(false);
+                                            entry.Resource = fhirParser.Parse<Patient>(response.responseString);
+                                        }
+                                    }
                                     else if (entry.Resource.TypeName == "Encounter")
                                         entry.Resource = fhirParser.Parse<Encounter>(response.responseString);
 
