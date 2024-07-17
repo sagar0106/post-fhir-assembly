@@ -296,6 +296,18 @@ namespace PostDnLKCloudFhirR4Api.Class
                 }
 
                 bundle.Type = BundleType.BatchResponse;
+
+                string xRequestId = string.Empty;
+                Patient pResource = bundle.GetResources().Where(p => p.TypeName.ToUpper() == "PATIENT").FirstOrDefault() as Patient;
+                xRequestId = pResource.Extension.Any() ? pResource.Extension?.Find(x => x.ElementId == "intermountain-XRequestID")?.Value?.ToString() : "";
+
+                if (String.IsNullOrWhiteSpace(xRequestId))
+                {
+                    Encounter eResource = bundle.GetResources().Where(p => p.TypeName.ToUpper() == "ENCOUNTER").FirstOrDefault() as Encounter;
+                    xRequestId = eResource.Extension.Any() ? eResource.Extension?.Find(x => x.ElementId == "intermountain-XRequestID")?.Value?.ToString() : "";
+                }
+
+
                 foreach (EntryComponent entry in bundle.Entry)
                 {
                     if (entry.Request != null)
@@ -314,7 +326,7 @@ namespace PostDnLKCloudFhirR4Api.Class
                                         serialized = serialized.Replace("<FIN_NUMBER>", finNumber);
                                     }
                                 }
-                                dynamic response = await fhirR4API.CreateRecord(serialized, entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey).ConfigureAwait(false);
+                                dynamic response = await fhirR4API.CreateRecord(serialized, entry.Resource.TypeName, FHIRBaseUrl, SiteServiceKey, xRequestId).ConfigureAwait(false);
                                 if (response.responseString.Contains("OperationOutcome"))
                                 {
                                     OperationOutcome outcome = fhirParser.Parse<OperationOutcome>(response);
