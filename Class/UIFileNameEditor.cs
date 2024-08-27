@@ -12,7 +12,7 @@ using System.ComponentModel;
 using System.ComponentModel.Design;
 using System.Windows.Forms;
 
-namespace PostDnLKCloudFhirR4Api.Class
+namespace PostDnFhirR4Api.Class
 {
     class UIFileNameEditor : System.Drawing.Design.UITypeEditor
     {

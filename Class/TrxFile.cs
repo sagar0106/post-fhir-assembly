@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace PostDnLKCloudFhirR4Api.Class
+namespace PostDnFhirR4Api.Class
 {
     class TrxFile
     {
@@ -39,7 +39,7 @@ namespace PostDnLKCloudFhirR4Api.Class
             ///'''''''''''''''''''''''''''''''''''''''
             // Get data from oRow
             //General _objGeneral = new General();
-            HL7UtilV2.HL7Util _objHL7Util = new HL7UtilV2.HL7Util();
+            HL7Util _objHL7Util = new HL7Util();
             try
             {
                 FileFolder = oRow["SourceLocation"].ToString();

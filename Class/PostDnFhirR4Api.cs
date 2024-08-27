@@ -4,39 +4,30 @@ using System.Data;
 using System.IO;
 using System.Diagnostics;
 using System.Collections.Generic;
-using PropertyGridExt;
-using HL7UtilV2;
-using LKEventLog;
 using System.Threading.Tasks;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Linq;
-using Ellkay.Events;
 using System.Xml.Linq;
-using FhirR4API;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Model;
 using static Hl7.Fhir.Model.Bundle;
 using Newtonsoft.Json;
 
-namespace PostDnLKCloudFhirR4Api.Class
+namespace PostDnFhirR4Api.Class
 {
-    [TypeConverter(typeof(PropertiesDeluxeTypeConverter))]
-    public class PostDnLKCloudFhirR4Api : IDisposable
+    public class PostDnFhirR4Api : IDisposable
     {
-        private readonly LKEventLogHelper<PostDnLKCloudFhirR4Api> _LKEventLogHelper;
-
         private bool _disposedValue = false; //To detect redundant calls
         private string _configFileName = "";
         private string _fileContent = "";
         private TrxFile _trxFile;
         private HL7Util _hl7Util;
 
-        public PostDnLKCloudFhirR4Api()
+        public PostDnFhirR4Api()
         {
             _hl7Util = new HL7Util();
-            _LKEventLogHelper = new LKEventLogHelper<PostDnLKCloudFhirR4Api>();
         }
 
         // This code added by Visual Basic to correctly implement the disposable pattern.
@@ -79,7 +70,6 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
         }
 
-        [PropertyOrder(1)]
         [CategoryAttribute("Authorization"),
         DisplayName("Authorization URL"),
         DescriptionAttribute("Specify Authorization Url to fetch token"),
@@ -87,7 +77,6 @@ namespace PostDnLKCloudFhirR4Api.Class
         BrowsableAttribute(true)]
         public string AuthorizationUrl { get; set; }
 
-        [PropertyOrder(2)]
         [CategoryAttribute("Authorization"),
         DisplayName("Client Id"),
         DescriptionAttribute("Specify Client Id"),
@@ -95,7 +84,6 @@ namespace PostDnLKCloudFhirR4Api.Class
         BrowsableAttribute(true)]
         public string ClientId { get; set; }
 
-        [PropertyOrder(3)]
         [CategoryAttribute("Authorization"),
         DisplayName("Client Secret"),
         DescriptionAttribute("Specify Client Secret"),
@@ -103,7 +91,6 @@ namespace PostDnLKCloudFhirR4Api.Class
         BrowsableAttribute(true)]
         public string ClientSecret { get; set; }
 
-        [PropertyOrder(1)]
         [CategoryAttribute("Request"),
         DisplayName("FHIR Base URL"),
         DescriptionAttribute("Specify the FHIR Base URL"),
@@ -111,7 +98,6 @@ namespace PostDnLKCloudFhirR4Api.Class
         BrowsableAttribute(true)]
         public string FHIRBaseUrl { get; set; }
 
-        [PropertyOrder(2)]
         [CategoryAttribute("Request"),
         DisplayName("Site Service Key"),
         DescriptionAttribute("Specify the Site Service Key"),
@@ -119,7 +105,6 @@ namespace PostDnLKCloudFhirR4Api.Class
         BrowsableAttribute(true)]
         public string SiteServiceKey { get; set; }
 
-        [PropertyOrder(3)]
         [CategoryAttribute("Request"),
          DisplayName("Response Files Folder"),
          DescriptionAttribute("Specify the folder to drop the FHIR responses."),
@@ -151,19 +136,8 @@ namespace PostDnLKCloudFhirR4Api.Class
             var accountNumber = oConfigRow["UserID"].ToString();
             var interfaceType = oConfigRow["InterfaceType"].ToString();
             var fileName = oDataRow["FileName"].ToString();
-            IFileSpecificEventFactory fileSpecificEvents = null;
-
             try
             {
-                fileSpecificEvents = _LKEventLogHelper.CreateFileSpecificEvents(accountNumber, interfaceType, fileName);
-                fileSpecificEvents.EnterAssembly();
-                fileSpecificEvents.EnterSpecificAssembly<LKEventLog.IFileSpecificEventFactory>();
-                fileSpecificEvents.EnterSpecificAssembly<HL7UtilV2.HL7Util>();
-                fileSpecificEvents.EnterSpecificAssembly<Ellkay.Events.EventFactory>();
-                fileSpecificEvents.EnterSpecificAssembly<Newtonsoft.Json.JsonConverter>();
-                fileSpecificEvents.EnterSpecificAssembly<log4net.AssemblyInfo>();
-                fileSpecificEvents.EnterSpecificAssembly<PropertiesDeluxeTypeConverter>();
-                fileSpecificEvents.EnterSpecificAssembly<FhirR4APIHelper>();
 
                 // Populate TrxFileRecord
                 _trxFile = new TrxFile(oDataRow);
@@ -171,7 +145,7 @@ namespace PostDnLKCloudFhirR4Api.Class
 
                 if (_trxFile.Content == null || _trxFile.Content.Length == 0)
                 {
-                    fileSpecificEvents.Debug("Nothing to process exiting");
+                    Console.WriteLine("Nothing to process exiting");
                     resultDetails.ErrorMessage = "File content is blank";
                     return resultDetails;
                 }
@@ -182,33 +156,20 @@ namespace PostDnLKCloudFhirR4Api.Class
                 }
 
                 //Ensure all assembly properties are provided 
-                ValidateProperties(fileSpecificEvents);
+                ValidateProperties();
 
-                resultDetails = ProcessData(resultDetails, fileSpecificEvents).GetAwaiter().GetResult();
+                resultDetails = ProcessData(resultDetails).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
-                if (fileSpecificEvents != null)
-                {
-                    fileSpecificEvents.Exception("Unexpected exception occurred in Execute().", ex);
-                    fileSpecificEvents.Debug("Marking file as Error.");
-                }
-                else
-                {
-                    resultDetails.DebugLog = ex.ToString();
-                }
+                resultDetails.DebugLog = ex.ToString();
                 resultDetails = _hl7Util.ErrorResultDetails(resultDetails, ex.Message, ResultDetails.LKTransferResponseStatus.Error);
             }
             finally
             {
                 sw.Stop();
 
-                if (fileSpecificEvents != null)
-                {
-                    fileSpecificEvents.Debug($"File Processed in {sw.ElapsedMilliseconds} milliseconds.");
-                    fileSpecificEvents.ExitAssembly();
-                    resultDetails.DebugLog += $"\n{fileSpecificEvents.GetLogs()}";
-                }
+                Console.WriteLine($"File Processed in {sw.ElapsedMilliseconds} milliseconds.");
             }
 
             return resultDetails;
@@ -246,12 +207,12 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
             catch (Exception ex)
             {
-                _LKEventLogHelper.CreateTopLevelEvents().Exception("Unexpected exception occurred in Save().", ex);
+                Console.WriteLine("Unexpected exception occurred in Save().", ex);
                 return false;
             }
         }
 
-        private void ValidateProperties(IFileSpecificEventFactory events)
+        private void ValidateProperties()
         {
             bool isValid = true;
 
@@ -259,7 +220,7 @@ namespace PostDnLKCloudFhirR4Api.Class
             {
                 if (String.IsNullOrWhiteSpace(value))
                 {
-                    events.Debug($"Please specify {propertyName}.");
+                    Console.WriteLine($"Please specify {propertyName}.");
                     isValid = false;
                 }
             }
@@ -272,13 +233,13 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
         }
 
-        private async Task<ResultDetails> ProcessData(ResultDetails resultDetails, IFileSpecificEventFactory events)
+        private async Task<ResultDetails> ProcessData(ResultDetails resultDetails)
         {
 
             var fhirSerializer = new FhirJsonSerializer();
             var fhirParser = new FhirJsonParser();
             Auth auth = new Auth { AuthorizationUrl = AuthorizationUrl, ClientID = ClientId, ClientSecret = ClientSecret };
-            FhirR4APIHelper fhirR4API = new FhirR4APIHelper(auth, events);
+            FhirR4API fhirR4API = new FhirR4API(auth);
             try
             {
                 // logic
@@ -377,7 +338,7 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
             catch (AggregateException aggEx)
             {
-                events.Exception("Unexpected exception occurred while processing the file.", aggEx);
+                Console.WriteLine("Unexpected exception occurred while processing the file.", aggEx);
 
                 int errorStatus = ResultDetails.LKTransferResponseStatus.Error;
                 string errorMessages = String.Join("; ", aggEx.InnerExceptions.Select(x => x.Message));
@@ -385,7 +346,7 @@ namespace PostDnLKCloudFhirR4Api.Class
                 //unwrap the AggregateException and loop through each one to try and identify transient errors, otherwise mark file as error 
                 foreach (Exception innerException in aggEx.InnerExceptions)
                 {
-                    errorStatus = EvaluateExceptionForTransientError(innerException, events, fhirR4API);
+                    errorStatus = EvaluateExceptionForTransientError(innerException, fhirR4API);
 
                     if (errorStatus == ResultDetails.LKTransferResponseStatus.TransientError)
                     {
@@ -397,58 +358,58 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
             catch (Exception ex)
             {
-                events.Exception("Unexpected exception occurred while processing the file.", ex);
-                events.Debug("Marking file as Error.");
-                return _hl7Util.ErrorResultDetails(resultDetails, $"Error: {ex.Message}", EvaluateExceptionForTransientError(ex, events, fhirR4API));
+                Console.WriteLine("Unexpected exception occurred while processing the file.", ex);
+                Console.WriteLine("Marking file as Error.");
+                return _hl7Util.ErrorResultDetails(resultDetails, $"Error: {ex.Message}", EvaluateExceptionForTransientError(ex, fhirR4API));
             }
         }
 
-        private int EvaluateExceptionForTransientError(Exception ex, IEventFactory events, FhirR4APIHelper fhirR4API)
+        private int EvaluateExceptionForTransientError(Exception ex, FhirR4API fhirR4API)
         {
             try
             {
                 switch (ex)
                 {
                     case CustomAPIException customResponseEx:
-                        return GetErrorStatusBasedOnHttpStatusCode(customResponseEx.HttpResponse.StatusCode, events, fhirR4API);
+                        return GetErrorStatusBasedOnHttpStatusCode(customResponseEx.HttpResponse.StatusCode, fhirR4API);
                     case TransientException _:
                     case HttpRequestException _:
                     case WebException _:
                     case SocketException _:
                     case TaskCanceledException _:
                     case TimeoutException _:
-                        events.Debug("Marking file as TransientError. An unknown exception was thrown.");
+                        Console.WriteLine("Marking file as TransientError. An unknown exception was thrown.");
                         return ResultDetails.LKTransferResponseStatus.TransientError;
                     default:
-                        events.Debug("Marking file as Error. An unknown exception was thrown.");
+                        Console.WriteLine("Marking file as Error. An unknown exception was thrown.");
                         return ResultDetails.LKTransferResponseStatus.Error;
                 }
             }
             catch (Exception unexpectedException)
             {
-                events.Exception("Unexpected exception occurred in EvaluateExceptionForTransientError().", unexpectedException);
-                events.Debug("Marking file as Error. An unexpected Exception was thrown.");
+                Console.WriteLine("Unexpected exception occurred in EvaluateExceptionForTransientError().", unexpectedException);
+                Console.WriteLine("Marking file as Error. An unexpected Exception was thrown.");
                 return ResultDetails.LKTransferResponseStatus.Error;
             }
         }
 
-        private int GetErrorStatusBasedOnHttpStatusCode(HttpStatusCode statusCode, IEventFactory events, FhirR4APIHelper fhirR4API)
+        private int GetErrorStatusBasedOnHttpStatusCode(HttpStatusCode statusCode, FhirR4API fhirR4API)
         {
             switch (statusCode)
             {
                 case HttpStatusCode.Unauthorized: //401 - requires human intervention to fix the credentials, mark as transient-error so once credentials are fixed queue continues, If token expire unauthorized
-                    events.Debug("Marking file as TransientError. Credentials are invalid or Token is invalid.");
+                    Console.WriteLine("Marking file as TransientError. Credentials are invalid or Token is invalid.");
                     fhirR4API.ExpireToken().GetAwaiter().GetResult();
                     return ResultDetails.LKTransferResponseStatus.TransientError;
                 case HttpStatusCode.ServiceUnavailable: //503 - api is down, hold message queue & keep retrying 
-                    events.Debug("Marking file as TransientError. API is currently unavailable.");
+                    Console.WriteLine("Marking file as TransientError. API is currently unavailable.");
                     return ResultDetails.LKTransferResponseStatus.TransientError;
                 case HttpStatusCode.Forbidden: //403 - token expired 
-                    events.Debug("Marking file as TransientError - token expired. Token will refresh on next attempt.");
+                    Console.WriteLine("Marking file as TransientError - token expired. Token will refresh on next attempt.");
                     fhirR4API.ExpireToken().GetAwaiter().GetResult();
                     return ResultDetails.LKTransferResponseStatus.TransientError;
                 default:
-                    events.Debug("Marking file as Error.");
+                    Console.WriteLine("Marking file as Error.");
                     return ResultDetails.LKTransferResponseStatus.Error;
             }
         }
@@ -489,7 +450,7 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
             catch (Exception ex)
             {
-                _LKEventLogHelper.CreateTopLevelEvents().Exception("Unexpected exception occurred in GetConfigDataSet().", ex);
+                Console.WriteLine("Unexpected exception occurred in GetConfigDataSet().", ex);
                 return null;
             }
         }
@@ -517,7 +478,7 @@ namespace PostDnLKCloudFhirR4Api.Class
             }
             catch (Exception ex)
             {
-                _LKEventLogHelper.CreateTopLevelEvents().Exception("Unexpected exception occurred in FillProperties().", ex);
+                Console.WriteLine("Unexpected exception occurred in FillProperties().", ex);
                 return false;
             }
         }

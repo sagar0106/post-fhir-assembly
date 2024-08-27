@@ -87,14 +87,9 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="LKTransferConfigData.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\PostDnLKCloudFhirR4Api.csproj">
+    <ProjectReference Include="..\PostDnFhirR4Api.csproj">
       <Project>{defdd73e-c0e6-4891-8445-458f8b2c049a}</Project>
-      <Name>PostDnAssemblyTemplateV2</Name>
+      <Name>PostDnFhirR4Api</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

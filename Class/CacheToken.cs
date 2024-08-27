@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 
 namespace PostDnFhirR4Api.Class
 {
-    public class TransientException : Exception
+    public class CacheToken
     {
-        public TransientException(string message) :
-          base(message)
-        {
-        }
+        public string ClientID { get; set; }
+        public string ClientSecret { get; set; }
+        public string Token { get; set; }
     }
 }

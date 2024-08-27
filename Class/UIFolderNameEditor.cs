@@ -6,7 +6,7 @@ using System.ComponentModel.Design;
 using System.Windows.Forms;
 using System;
 
-namespace PostDnLKCloudFhirR4Api.Class
+namespace PostDnFhirR4Api.Class
 {
     public class UIFolderNameEditor : System.Drawing.Design.UITypeEditor
     {
